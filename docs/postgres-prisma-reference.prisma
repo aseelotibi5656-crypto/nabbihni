@@ -1,0 +1,417 @@
+// ---------------------------------------------------------------------------
+//  نَبّهني — Prisma Schema
+// ---------------------------------------------------------------------------
+//  المزود الحالي: SQLite (تطوير محلي بدون أي إعداد خارجي).
+//  للانتقال إلى الإنتاج: غيّر provider إلى "postgresql" وحدّث DATABASE_URL.
+//  الحقول من نوع String[] مُخزَّنة كـ CSV عبر أعمدة نصية للتوافق مع SQLite،
+//  ويتم تحويلها في طبقة الوصول للبيانات (src/server/*) فقط، لا في الواجهة.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================ المستخدمون والحسابات ============================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  avatarUrl     String?
+  emailVerified DateTime?
+  locale        String    @default("ar")
+  timezone      String    @default("Asia/Riyadh")
+  plan          String    @default("free") // free | pro | business
+  role          String    @default("user") // user | admin
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  settings          UserSettings?
+  tasks             Task[]
+  events            Event[]
+  habits            Habit[]
+  habitLogs         HabitLog[]
+  categories        Category[]
+  reminders         Reminder[]
+  notifications     Notification[]
+  sessions          Session[]
+  tokens            VerificationToken[]
+  pushSubscriptions PushSubscription[]
+  ownedWorkspaces   Workspace[]         @relation("WorkspaceOwner")
+  memberships       WorkspaceMember[]
+  aiConversations   AiConversation[]
+
+  @@index([email])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenHash    String   @unique
+  userAgent    String?
+  ip           String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// رموز مؤقتة لتفعيل البريد وإعادة تعيين كلمة المرور
+model VerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  type      String // email_verification | password_reset
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  theme          String  @default("system") // light | dark | system
+  accentColor    String  @default("indigo")
+  weekStartsOn   Int     @default(0) // 0 = الأحد
+  timeFormat     String  @default("12") // 12 | 24
+  defaultView    String  @default("day") // day | week | month | year
+
+  // الإشعارات
+  pushEnabled       Boolean @default(true)
+  emailEnabled      Boolean @default(false)
+  soundEnabled      Boolean @default(true)
+  dailyDigest       Boolean @default(true)
+  digestTime        String  @default("08:00")
+  quietHoursEnabled Boolean @default(false)
+  quietHoursStart   String  @default("23:00")
+  quietHoursEnd     String  @default("07:00")
+
+  /// التذكيرات الافتراضية بالدقائق قبل الموعد (CSV) — نظام التذكير الذكي
+  defaultReminderOffsets String @default("10")
+  smartRemindersEnabled  Boolean @default(true)
+  smartRescheduleEnabled Boolean @default(true)
+
+  // الخصوصية
+  analyticsOptIn Boolean @default(true)
+  profilePublic  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ================================ المساحات =================================
+
+/// جاهزة لميزة المشاركة والفرق مستقبلاً — كل مستخدم لديه مساحة شخصية افتراضية
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  isPersonal Boolean @default(true)
+  plan      String   @default("free")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner      User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members    WorkspaceMember[]
+  tasks      Task[]
+  events     Event[]
+  categories Category[]
+  habits     Habit[]
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("member") // owner | admin | member
+  invitedBy   String?
+  joinedAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// =============================== التصنيفات ================================
+
+model Category {
+  id          String  @id @default(cuid())
+  userId      String
+  workspaceId String?
+  name        String
+  color       String  @default("indigo")
+  icon        String  @default("folder")
+  isSystem    Boolean @default(false)
+  sortOrder   Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  tasks     Task[]
+  events    Event[]
+  habits    Habit[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// ================================= المهام =================================
+
+model Task {
+  id          String  @id @default(cuid())
+  userId      String
+  workspaceId String?
+  categoryId  String?
+
+  title       String
+  description String?
+  notes       String?
+
+  /// وقت الاستحقاق مخزّن دائماً بـ UTC؛ العرض يتم بتوقيت المستخدم
+  dueAt       DateTime?
+  allDay      Boolean   @default(false)
+  durationMin Int?
+
+  priority String  @default("medium") // low | medium | high | urgent
+  status   String  @default("pending") // pending | completed | archived
+
+  completedAt DateTime?
+  rescheduledFrom DateTime?
+  rescheduleCount Int      @default(0)
+
+  // التكرار
+  isRecurring     Boolean @default(false)
+  recurrenceRule  String? // JSON: { freq, interval, byWeekday[], until, count }
+  recurrenceParentId String?
+  occurrenceDate  DateTime?
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  reminders   Reminder[]
+  attachments Attachment[]
+  parent      Task?       @relation("TaskOccurrences", fields: [recurrenceParentId], references: [id], onDelete: Cascade)
+  occurrences Task[]      @relation("TaskOccurrences")
+
+  @@index([userId, dueAt])
+  @@index([userId, status])
+  @@index([recurrenceParentId])
+}
+
+// ================================ المواعيد ================================
+
+model Event {
+  id          String  @id @default(cuid())
+  userId      String
+  workspaceId String?
+  categoryId  String?
+
+  title       String
+  description String?
+  location    String?
+  startAt     DateTime
+  endAt       DateTime
+  allDay      Boolean  @default(false)
+  color       String   @default("indigo")
+
+  isRecurring    Boolean @default(false)
+  recurrenceRule String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  category  Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  reminders Reminder[]
+
+  @@index([userId, startAt])
+}
+
+// =============================== التذكيرات ================================
+
+model Reminder {
+  id      String @id @default(cuid())
+  userId  String
+  taskId  String?
+  eventId String?
+  habitId String?
+
+  /// عدد الدقائق قبل الموعد (0 = في وقت الموعد بالضبط)
+  offsetMinutes Int      @default(0)
+  /// الوقت المطلق المحسوب للإرسال (UTC) — عليه يعمل محرّك الإرسال
+  triggerAt     DateTime
+  channel       String   @default("push") // push | email | inapp | whatsapp
+  status        String   @default("scheduled") // scheduled | sent | failed | cancelled | dismissed
+  sentAt        DateTime?
+  attempts      Int      @default(0)
+  lastError     String?
+  createdAt     DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task  Task?  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  habit Habit? @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@index([status, triggerAt])
+  @@index([userId, triggerAt])
+}
+
+// ================================ العادات =================================
+
+model Habit {
+  id          String  @id @default(cuid())
+  userId      String
+  workspaceId String?
+  categoryId  String?
+
+  title       String
+  description String?
+  icon        String  @default("sparkles")
+  color       String  @default("emerald")
+
+  frequency  String @default("daily") // daily | weekly | custom_days | times_per_week
+  /// أيام الأسبوع المستهدفة (CSV: 0=الأحد … 6=السبت)
+  targetDays String @default("0,1,2,3,4,5,6")
+  targetPerPeriod Int @default(1)
+  unit       String @default("مرة")
+  timeOfDay  String? // HH:mm
+
+  isArchived Boolean  @default(false)
+  startDate  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  category  Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  logs      HabitLog[]
+  reminders Reminder[]
+
+  @@index([userId])
+}
+
+model HabitLog {
+  id      String @id @default(cuid())
+  habitId String
+  userId  String
+
+  /// اليوم بصيغة YYYY-MM-DD بتوقيت المستخدم — يمنع ازدواج التسجيل
+  date      String
+  value     Int      @default(1)
+  completed Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@index([userId, date])
+}
+
+// =============================== الإشعارات ================================
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+
+  type     String // reminder | digest | system | reschedule | streak
+  title    String
+  body     String
+  /// بيانات إضافية بصيغة JSON (معرف المهمة، الرابط…)
+  data     String?
+  link     String?
+  readAt   DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================== المرفقات و AI ==============================
+
+model Attachment {
+  id       String @id @default(cuid())
+  taskId   String
+  name     String
+  url      String
+  mimeType String
+  size     Int
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+/// سجل محادثات المساعد الذكي — يسمح بإضافة مزود LLM لاحقاً دون تغيير المخطط
+model AiConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("محادثة جديدة")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([userId])
+}
+
+model AiMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // user | assistant | system
+  content        String
+  /// نتيجة تحليل النية بصيغة JSON (intent, entities, confidence)
+  intent         String?
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}

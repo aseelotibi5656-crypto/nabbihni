@@ -1,0 +1,34 @@
+# التبعيات
+node_modules/
+.pnp
+.pnp.js
+
+# البناء
+.next/
+out/
+build/
+dist/
+
+# قاعدة البيانات المحلية
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# البيئة — لا ترفع المفاتيح أبدًا
+.env
+.env.local
+.env*.local
+
+# السجلات وملفات النظام
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+next-env.d.ts
+
+# المحررات
+.vscode/*
+!.vscode/extensions.json
+.idea/

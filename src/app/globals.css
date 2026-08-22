@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   نظام التصميم — نَبّهني
+   الألوان معرّفة كقنوات RGB حتى تعمل مع شفافية Tailwind (bg-brand/10)
+   ========================================================================== */
+
+@layer base {
+  :root {
+    --c-bg: 248 249 252;
+    --c-surface: 255 255 255;
+    --c-elevated: 255 255 255;
+    --c-line: 229 231 240;
+    --c-fg: 15 23 42;
+    --c-muted: 100 116 139;
+    --c-faint: 148 163 184;
+
+    --c-brand: 79 70 229;
+    --c-brand-soft: 238 238 255;
+    --c-brand-strong: 67 56 202;
+    --c-brand-fg: 255 255 255;
+
+    --c-accent: 14 165 233;
+    --c-success: 16 185 129;
+    --c-warning: 245 158 11;
+    --c-danger: 244 63 94;
+    --c-info: 59 130 246;
+
+    /* ألوان الرسوم البيانية — لوحة مُتحقَّق منها لعمى الألوان */
+    --viz-1: #2a78d6;
+    --viz-2: #eb6834;
+    --viz-3: #1baf7a;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --c-bg: 9 11 20;
+    --c-surface: 17 20 32;
+    --c-elevated: 23 27 41;
+    --c-line: 38 43 60;
+    --c-fg: 236 240 248;
+    --c-muted: 148 160 182;
+    --c-faint: 108 120 142;
+
+    --c-brand: 129 122 255;
+    --c-brand-soft: 31 30 66;
+    --c-brand-strong: 149 143 255;
+    --c-brand-fg: 12 12 24;
+
+    --c-accent: 56 189 248;
+    --c-success: 52 211 153;
+    --c-warning: 251 191 36;
+    --c-danger: 251 113 133;
+    --c-info: 96 165 250;
+
+    /* نفس الألوان مُعادة الاشتقاق للخلفية الداكنة (وليست انعكاسًا آليًا) */
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply overflow-x-hidden bg-bg text-fg antialiased;
+    font-feature-settings: 'kern', 'liga';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* تحسين شكل عناصر الإدخال في المتصفحات العربية */
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+
+  input[type='date'],
+  input[type='time'] {
+    direction: ltr;
+    text-align: right;
+  }
+
+  /* شريط تمرير أنيق */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-faint;
+    background-clip: content-box;
+  }
+
+  ::selection {
+    @apply bg-brand/20;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/60 ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface shadow-soft;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card;
+  }
+
+  .container-app {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-title {
+    @apply text-lg font-bold tracking-tight sm:text-xl;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-fg;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[15px] text-fg
+           placeholder:text-faint transition-colors
+           focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .field-error {
+    @apply border-danger/60 focus:border-danger focus:ring-danger/25;
+  }
+
+  .hint {
+    @apply mt-1.5 text-xs text-muted;
+  }
+
+  .error-text {
+    @apply mt-1.5 flex items-center gap-1 text-xs font-medium text-danger;
+  }
+
+  /* خلفية متدرّجة ناعمة للأقسام التسويقية */
+  .mesh {
+    background-image:
+      radial-gradient(at 12% 8%, rgb(var(--c-brand) / 0.14) 0px, transparent 55%),
+      radial-gradient(at 88% 2%, rgb(var(--c-accent) / 0.12) 0px, transparent 50%),
+      radial-gradient(at 70% 85%, rgb(var(--c-brand) / 0.1) 0px, transparent 55%);
+  }
+
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgb(var(--c-line) / 0.7) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--c-line) / 0.7) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  .glass {
+    @apply border border-white/10 bg-surface/70 backdrop-blur-xl;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-lg bg-line/70;
+  }
+
+  /* شريط تمرير مخفي للتبويبات الأفقية */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* الأرقام دائماً بالاتجاه الصحيح داخل نص عربي */
+  .num {
+    direction: ltr;
+    display: inline-block;
+    unicode-bidi: isolate;
+  }
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
