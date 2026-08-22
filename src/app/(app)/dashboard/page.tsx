@@ -11,16 +11,25 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   const user = await requireUser('/dashboard');
-  const tz = user.timezone;
+  const tz = user?.timezone || 'UTC';
   const today = todayKey(tz);
 
-  const [summary, agenda, tasks, habits, overdue] = [
-    dashboardSummary(user.id, tz),
-    todayAgenda(user.id, tz),
-    listTasks(user.id, tz, { view: 'today' }),
-    listHabits(user.id, tz).filter((h) => isScheduledDay(h.frequency, h.targetDays, today)),
-    overdueTasks(user.id, 10),
-  ];
+  let summary = { completed: 0, total: 0, percentage: 0 };
+  let agenda = [];
+  let tasks = [];
+  let habits = [];
+  let overdue = [];
+
+  try {
+    summary = dashboardSummary(user.id, tz) || summary;
+    agenda = todayAgenda(user.id, tz) || agenda;
+    tasks = listTasks(user.id, tz, { view: 'today' }) || tasks;
+    const allHabits = listHabits(user.id, tz) || [];
+    habits = allHabits.filter((h) => isScheduledDay(h.frequency, h.targetDays, today));
+    overdue = overdueTasks(user.id, 10) || overdue;
+  } catch (error) {
+    console.error('Failed to fetch dashboard data:', error);
+  }
 
   return (
     <DashboardView
