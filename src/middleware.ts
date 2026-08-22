@@ -1,48 +1,23 @@
-import { NextResponse, type NextRequest } from 'next/server';
-
-/**
- * حارس المسارات
- * ---------------------------------------------------------------------------
- * يتحقق من وجود كوكي الجلسة قبل عرض أي صفحة محميّة، فيمنع حتى بدء تصييرها.
- * التحقق الكامل (توقيع الرمز + وجود الجلسة في قاعدة البيانات) يبقى في
- * طبقة الخادم — هذه الطبقة للتوجيه السريع فقط، وليست بديلاً عن التحقق.
- */
-
-const PROTECTED = [
-  '/dashboard',
-  '/tasks',
-  '/calendar',
-  '/habits',
-  '/analytics',
-  '/notifications',
-  '/settings',
-  '/profile',
-];
-
-const GUEST_ONLY = ['/login', '/register'];
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
-  const hasSession = Boolean(request.cookies.get('nabbihni_session')?.value);
+  const token = request.cookies.get('auth_token')?.value || request.cookies.get('session')?.value;
+  const { pathname } = request.nextUrl;
 
-  if (!hasSession && PROTECTED.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    url.search = `?next=${encodeURIComponent(pathname + search)}`;
-    return NextResponse.redirect(url, 307);
+  // 1. إذا كان المستخدم مسجلاً ودخل لصفحة التسجيل أو الدخول، وجهه للداشبورد
+  if (token && (pathname === '/login' || pathname === '/register')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  if (hasSession && GUEST_ONLY.includes(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    url.search = '';
-    return NextResponse.redirect(url, 307);
+  // 2. إذا لم يكن مسجلاً وحاول دخول الداشبورد، وجهه للتسجيل
+  if (!token && pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  // نتجاوز أصول Next والملفات الثابتة حتى لا نضيف زمنًا على كل طلب
-  matcher: ['/((?!api|_next/static|_next/image|icons|favicon.ico|manifest.webmanifest|sw.js).*)'],
+  matcher: ['/dashboard/:path*', '/login', '/register'],
 };
